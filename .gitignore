@@ -1,3 +1,7 @@
+
+tactic-*
+
+
 *.py[cod]
 
 # C extensions
