@@ -313,7 +313,20 @@ class PythonApplet(QtCore.QObject):
     def unzip_file(my, from_path, to_dir):
         zip_util = ZipUtil()
         return zip_util.extract(from_path, to_dir)
-        
+
+
+
+    # TEST start the watch folder
+    @QtCore.Slot(str, str, str, result=str)
+    def start_watch_folder(my, server, ticket, project):
+        from watch_local_checkin import WatchLocalRepoCmd
+        WatchLocalRepoCmd(
+                server=server,
+                ticket=ticket,
+                project=project
+        ).start()
+        return "OK"
+
 
     def _py_version(my):  
         '''Return the Python version.'''
@@ -436,6 +449,10 @@ def open_tactic(url=None, client_only=False):
         library_dir = os.path.abspath("../../../PlugIns")
         app.setLibraryPaths([library_dir])
         os.chdir(working_dir)
+
+    pixmap = QtGui.QPixmap("bin/favicon.ico")
+    icon = QtGui.QIcon(pixmap)
+    QtGui.QApplication.setWindowIcon(icon)
     
     pixmap = QtGui.QPixmap("bin/tactic_silver.png")
     splash = QtGui.QSplashScreen(pixmap)
@@ -497,6 +514,7 @@ def open_tactic(url=None, client_only=False):
                 if check_tactic(url, limit=2, verbose=False):
                     break
                 time.sleep(0.5)
+
 
   
   
