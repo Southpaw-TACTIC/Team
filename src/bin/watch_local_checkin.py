@@ -15,7 +15,7 @@ __all__ = ['WatchLocalRepoCmd']
 
 import tacticenv
 
-
+import threading
 import time
 import os
 
@@ -44,11 +44,10 @@ class CheckinLoggingEventHandler(LoggingEventHandler):
 
         if src_path.endswith(".temp"):
             try:
-                self.upload_file(dest_path)
+                PATHS.append(dest_path)
+                print "ADDED PATHS: ", PATHS
             except Exception, e:
                 print "Error: ", e
-
-            #os.unlink(event.dest_path)
 
 
 
@@ -93,14 +92,45 @@ class CheckinLoggingEventHandler(LoggingEventHandler):
 
 
 
+PATHS = []
+class WatchFolderUploadThread(threading.Thread):
 
+    def run(my):
+        paths = PATHS
+        event_handler = CheckinLoggingEventHandler()
+        while 1:
+            try:
+                path = paths.pop(0)
+            except IndexError:
+                time.sleep(1)
+                continue
 
+            try:
+                base, ext = os.path.splitext(path)
+                locked_path = "%s.locked" % base
+
+                # if there already is a locked file, then skip this one because
+                # is being uploaded
+                if os.path.exists(locked_path):
+                    continue
+
+                #self.upload_file(dest_path)
+                f = open( locked_path, "w")
+                f.close()
+
+                print "uploading path: ", path
+                event_handler.upload_file(path)
+                #time.sleep(10)
+                #os.unlink(path)
+            finally:
+                os.unlink( locked_path )
+
+ 
 
 class WatchLocalRepoCmd(object):
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
-        print "kwargs: ", kwargs
 
         project = kwargs.get("project")
         server = kwargs.get("server")
@@ -133,14 +163,23 @@ class WatchLocalRepoCmd(object):
 
         event_handler = CheckinLoggingEventHandler()
 
+        print "repo_dir: ", repo_dir
+
         # upload all files in this folder
         for root, dirnames, basenames in os.walk(repo_dir):
             for basename in basenames:
-                if basename.endswith(".temp"):
+                tmp, ext = os.path.splitext(basename)
+                if ext in ['.temp', 'locked']:
                     continue
                 full_path = "%s/%s" % (root, basename)
                 print "path: ", full_path
-                event_handler.upload_file(full_path)
+                PATHS.append(full_path)
+                #event_handler.upload_file(full_path)
+
+        upload = WatchFolderUploadThread()
+        upload.daemon = True
+        upload.start()
+
 
         print "---"
         from watchdog.observers import Observer
@@ -161,6 +200,7 @@ class WatchLocalRepoCmd(object):
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
+            print "KEYBOARD BREAK"
             self.stop()
 
 
@@ -170,9 +210,12 @@ def main():
 
 if __name__ == "__main__":
     ticket = 'b22bf1c42424708b55ec775751cd0eab'
-    os.environ['TACTIC_PROJECT'] = 'ingest'
     os.environ['TACTIC_SERVER'] = '192.168.1.96'
     os.environ['TACTIC_TICKET'] = ticket
 
 
     main()
+
+
+
+

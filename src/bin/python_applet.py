@@ -19,7 +19,7 @@ import sys, os, shutil, hashlib
 import json
 import urllib
 import time
-from PySide import QtCore, QtGui, QtWebKit
+from PySide import QtCore, QtGui, QtWebKit, QtNetwork
 
 
 
@@ -405,8 +405,55 @@ def check_tactic(url, limit=3, verbose=True):
 
 
 #
-# Test standalone client
+# Standalone client
 #
+
+
+
+class CustomMainWindow(QtGui.QMainWindow):
+
+    # Cookies implementation referenced from
+    # http://code.google.com/p/devicenzo/source/browse/trunk/devicenzo.py?spec=svn52&r=52#24
+
+
+    def __init__(self):
+        QtGui.QMainWindow.__init__(self)
+
+        self.settings = QtCore.QSettings("Southpaw Technology Inc", "TACTIC")
+
+        self.cookie_jar = QtNetwork.QNetworkCookieJar()
+        cookies = []
+        for c in self.get("cookiejar", []):
+            # For some reason, it has to be parsed as a string (not unicode)
+            cookie = QtNetwork.QNetworkCookie.parseCookies(str(c))[0]
+            cookies.append(cookie)
+        self.cookie_jar.setAllCookies(cookies)
+
+    def load_url(self, url):
+        webView = CustomWebView()  
+        webView.load(QtCore.QUrl(url))
+        webView.page().networkAccessManager().setCookieJar(self.cookie_jar)
+        self.setCentralWidget(webView)  
+
+
+    def put(self, key, value):
+        "Persist an object somewhere under a given key"
+        self.settings.setValue(key, json.dumps(value))
+        self.settings.sync()
+
+    def get(self, key, default=None):
+        "Get the object stored under 'key' in persistent storage, or the default value"
+        v = self.settings.value(key)
+        if v:
+            return json.loads(unicode(v))
+        else:
+            return default
+
+
+    def closeEvent(self, evt):
+        for c in self.cookie_jar.allCookies():
+            cookie = c.toRawForm()
+        self.put("cookiejar", [str(c.toRawForm()) for c in self.cookie_jar.allCookies()])
 
 
 class CustomWebView(QtWebKit.QWebView):
@@ -432,7 +479,7 @@ class CustomWebView(QtWebKit.QWebView):
     def createWindow(self, webWindowType):
         self.view = CustomWebView()
         self.view.setGeometry(100, 100, 1024, 768)
-        self.view.setWindowTitle("TACTIC2")
+        self.view.setWindowTitle("TACTIC")
         self.view.show()
         return self.view
 
@@ -519,28 +566,43 @@ def open_tactic(url=None, client_only=False):
                 time.sleep(0.5)
 
 
-  
-  
-    webView = CustomWebView()  
-    webView.load(QtCore.QUrl(url))
-  
-    window = QtGui.QMainWindow()
-    #screen = QtGui.QDesktopWidget().screenGeometry()
-    #window.setGeometry(0, 0, screen.width(), screen.height())
-    #window.setGeometry(100, 100, 1200, 600)
 
-    geometry = None
+
+ 
+    window = CustomMainWindow()
     if os.path.exists(data_dir):
         geometry = Config.get_value("window", "geometry")
+        title = Config.get_value("window", "title")
+    else:
+        geometry = None
+        title = None
+
+    if title:
+        title = "TACTIC"
 
     if geometry:
         parts = geometry.split(",")
         parts = [int(x) for x in parts]
         window.setGeometry(parts[0], parts[1], parts[2], parts[3])
-    splash.finish(window)
     window.setWindowTitle("TACTIC")
-    window.setCentralWidget(webView)  
+    window.load_url(url)
+
     window.show()  
+    splash.finish(window)
+
+
+
+    start_watch_folder = False
+    if start_watch_folder:
+        server = url
+        from watch_local_checkin import WatchLocalRepoCmd
+        WatchLocalRepoCmd(
+                server=url,
+                ticket=ticket,
+                project=project
+        ).start()
+ 
+
   
     sys.exit(app.exec_())
 
