@@ -459,11 +459,14 @@ def open_tactic(url=None, client_only=False):
     splash.show()
 
     start_server = False
+    data_dir = tacticenv.get_data_dir()
 
     if not url:
-        url = Config.get_value("window", "url")
-        if url and not url.startswith("http://") and not url.startswith("https://") and not url.startswith("./"):
-            url = "%s/config/%s" % (tacticenv.get_data_dir(), url)
+        if os.path.exists(data_dir):
+            url = Config.get_value("window", "url")
+            if url and not url.startswith("http://") and not url.startswith("https://") and not url.startswith("./"):
+                url = "%s/config/%s" % (tacticenv.get_data_dir(), url)
+        start_server = True
 
     if not url:
         url = 'http://127.0.0.1:9123/tactic'
@@ -526,7 +529,10 @@ def open_tactic(url=None, client_only=False):
     #window.setGeometry(0, 0, screen.width(), screen.height())
     #window.setGeometry(100, 100, 1200, 600)
 
-    geometry = Config.get_value("window", "geometry")
+    geometry = None
+    if os.path.exists(data_dir):
+        geometry = Config.get_value("window", "geometry")
+
     if geometry:
         parts = geometry.split(",")
         parts = [int(x) for x in parts]
