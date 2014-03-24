@@ -428,9 +428,20 @@ class CustomMainWindow(QtGui.QMainWindow):
             cookie = QtNetwork.QNetworkCookie.parseCookies(str(c))[0]
             cookies.append(cookie)
         self.cookie_jar.setAllCookies(cookies)
+        self.webView = CustomWebView()  
+
+    def add_shortcuts(self):
+        '''add shortcut keys'''
+
+        # zoom functions
+        wv = self.webView
+        self.zoom_in = QtGui.QShortcut("Ctrl++", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_in2 = QtGui.QShortcut("Ctrl+=", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_out = QtGui.QShortcut("Ctrl+-", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()-.2))
+        self.zoom_reset = QtGui.QShortcut("Ctrl+0", self, activated = lambda: wv.setZoomFactor(1))
 
     def load_url(self, url):
-        webView = CustomWebView()  
+        webView = self.webView
         webView.load(QtCore.QUrl(url))
         webView.page().networkAccessManager().setCookieJar(self.cookie_jar)
         self.setCentralWidget(webView)  
@@ -585,6 +596,7 @@ def open_tactic(url=None, client_only=False):
         parts = [int(x) for x in parts]
         window.setGeometry(parts[0], parts[1], parts[2], parts[3])
     window.setWindowTitle("TACTIC")
+    window.add_shortcuts()
     window.load_url(url)
 
     window.show()  
