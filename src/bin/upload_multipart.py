@@ -65,7 +65,10 @@ class UploadMultipart(object):
                 fields.append( ("login_ticket", my.ticket) )
                 basename = os.path.basename(path)
                 from json import dumps as jsondumps
-                basename = basename.decode(sys.stdout.encoding)
+                encoding = sys.stdout.encoding
+                if not encoding:
+                    encoding = 'UTF-8'
+                basename = basename.decode(encoding)
                 basename = jsondumps(basename)
                 basename = basename.strip('"')
                 # the first index begins at 0
