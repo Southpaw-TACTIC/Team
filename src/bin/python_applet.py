@@ -222,7 +222,7 @@ class PythonApplet(QtCore.QObject):
     @QtCore.Slot(str, result=str)
     def open_file(my, path):
         os.system(path)
-	return data
+	return "OK"
 
 
     @QtCore.Slot(str, str, str, result=str)
@@ -449,6 +449,13 @@ class CustomMainWindow(QtGui.QMainWindow):
         else:
             return default
 
+    def get_cookie_value(self, name):
+        for c in self.cookie_jar.allCookies():
+            if c.name() == name:
+                value = c.value()
+                value = str(value)
+                return value
+        return ""
 
     def closeEvent(self, evt):
         for c in self.cookie_jar.allCookies():
@@ -457,7 +464,7 @@ class CustomMainWindow(QtGui.QMainWindow):
 
 
 class CustomWebView(QtWebKit.QWebView):
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
 
         QtWebKit.QWebView.__init__(self, parent)
 
@@ -473,13 +480,20 @@ class CustomWebView(QtWebKit.QWebView):
         QtCore.QObject.connect(self.page().mainFrame(),
            QtCore.SIGNAL('javaScriptWindowObjectCleared()'), loadJavaScriptObjects)
 
+        self.parent = parent
+
 
 
 
     def createWindow(self, webWindowType):
+        title = self.windowTitle()
+        if not title:
+            title = "TACTIC"
+        g = self.geometry()
         self.view = CustomWebView()
-        self.view.setGeometry(100, 100, 1024, 768)
-        self.view.setWindowTitle("TACTIC")
+        self.view.setGeometry(100, 100, g.width(), g.height())
+        #self.view.setGeometry(g)
+        self.view.setWindowTitle(title)
         self.view.show()
         return self.view
 
@@ -577,14 +591,18 @@ def open_tactic(url=None, client_only=False):
         geometry = None
         title = None
 
-    if title:
-        title = "TACTIC"
+    if not title:
+        title = "TACTIC - %s" % url
 
-    if geometry:
+    geometry = "fullscreen"
+    if geometry == "fullscreen":
+        window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        window.showFullScreen()
+    elif geometry:
         parts = geometry.split(",")
         parts = [int(x) for x in parts]
         window.setGeometry(parts[0], parts[1], parts[2], parts[3])
-    window.setWindowTitle("TACTIC")
+    window.setWindowTitle(title)
     window.load_url(url)
 
     window.show()  
@@ -592,15 +610,28 @@ def open_tactic(url=None, client_only=False):
 
 
 
+    #start_watch_folder = True
     start_watch_folder = False
     if start_watch_folder:
-        server = url
-        from watch_local_checkin import WatchLocalRepoCmd
-        WatchLocalRepoCmd(
-                server=url,
-                ticket=ticket,
-                project=project
-        ).start()
+
+        from urlparse import urlparse
+        u = urlparse(url)
+
+        ticket = window.get_cookie_value("login_ticket")
+        project = "ingest"
+        server = "%s://%s" % (u.scheme, u.netloc)
+
+        print "ticket: ", ticket
+        print "server: ", server
+        try:
+            from watch_local_checkin import WatchLocalRepoCmd
+            WatchLocalRepoCmd(
+                    server=server,
+                    ticket=ticket,
+                    project=project
+            ).start()
+        except Exception, e:
+            print "ERROR: ", e
  
 
   

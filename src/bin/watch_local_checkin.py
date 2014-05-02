@@ -45,7 +45,6 @@ class CheckinLoggingEventHandler(LoggingEventHandler):
         if src_path.endswith(".temp"):
             try:
                 PATHS.append(dest_path)
-                print "ADDED PATHS: ", PATHS
             except Exception, e:
                 print "Error: ", e
 
@@ -56,7 +55,6 @@ class CheckinLoggingEventHandler(LoggingEventHandler):
         server = TacticServerStub.get(protocol="xmlrpc")
 
         path = path.replace("\\", "/")
-        print "Uploading file: ", path
 
         if os.name == 'nt':
             base_dir = server.get_base_dirs().get("win32_local_repo_dir")
@@ -118,7 +116,7 @@ class WatchFolderUploadThread(threading.Thread):
                 f = open( locked_path, "w")
                 f.close()
 
-                print "uploading path: ", path
+                print "Uploading path: ", path
                 event_handler.upload_file(path)
                 #time.sleep(10)
                 #os.unlink(path)
@@ -172,7 +170,6 @@ class WatchLocalRepoCmd(object):
                 if ext in ['.temp', 'locked']:
                     continue
                 full_path = "%s/%s" % (root, basename)
-                print "path: ", full_path
                 PATHS.append(full_path)
                 #event_handler.upload_file(full_path)
 
@@ -181,7 +178,6 @@ class WatchLocalRepoCmd(object):
         upload.start()
 
 
-        print "---"
         from watchdog.observers import Observer
         self.observer = Observer()
         self.observer.schedule(event_handler, path=repo_dir, recursive=True)
