@@ -22,7 +22,6 @@ import time
 from PySide import QtCore, QtGui, QtWebKit, QtNetwork
 
 
-
 class PythonApplet(QtCore.QObject):
 
     @QtCore.Slot(str)  
@@ -428,9 +427,20 @@ class CustomMainWindow(QtGui.QMainWindow):
             cookie = QtNetwork.QNetworkCookie.parseCookies(str(c))[0]
             cookies.append(cookie)
         self.cookie_jar.setAllCookies(cookies)
+        self.webView = CustomWebView()  
+
+    def add_shortcuts(self):
+        '''add shortcut keys'''
+
+        # zoom functions
+        wv = self.webView
+        self.zoom_in = QtGui.QShortcut("Ctrl++", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_in2 = QtGui.QShortcut("Ctrl+=", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_out = QtGui.QShortcut("Ctrl+-", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()-.2))
+        self.zoom_reset = QtGui.QShortcut("Ctrl+0", self, activated = lambda: wv.setZoomFactor(1))
 
     def load_url(self, url):
-        webView = CustomWebView()  
+        webView = self.webView
         webView.load(QtCore.QUrl(url))
         webView.page().networkAccessManager().setCookieJar(self.cookie_jar)
         self.setCentralWidget(webView)  
@@ -641,6 +651,22 @@ def open_tactic(url=None, client_only=False):
  
 if __name__ == "__main__":
     
+    def log_setup():
+        data_dir =  tacticenv.get_data_dir()
+        log_dir = '%s/temp/log' % data_dir
+        stdout_path = '%s/stdout.log'%log_dir
+        stderr_path = '%s/stderr.log'%log_dir
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+            if os.path.exists(stdout_path) and os.path.getsize(stdout_path)/(1024*1024) > 50:
+                os.unlink(stdout_path)
+            if os.path.exists(stderr_path) and os.path.getsize(stderr_path)/(1024*1024) > 50:
+                os.unlink(stderr_path)
+        
+        sys.stdout = open(stdout_path,'a')
+        sys.stderr = open(stderr_path,'a')
+
+    log_setup()
     from optparse import OptionParser
 
     parser = OptionParser()

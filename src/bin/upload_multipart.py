@@ -9,6 +9,7 @@
 __all__ = ['UploadMultipart', 'TacticUploadException']
 
 import httplib, urlparse, socket
+import os, sys
 
 class TacticUploadException(Exception):
     pass
@@ -40,8 +41,9 @@ class UploadMultipart(object):
 
     def execute(my, path):
         assert my.server_url
-
-        f = open(path, 'rb')
+        #f = open(path, 'rb')
+        import codecs
+        f = codecs.open(path, 'rb')
 
         count = 0
         while 1:
@@ -61,10 +63,22 @@ class UploadMultipart(object):
             if my.ticket:
                 fields.append( ("ticket", my.ticket) )
                 fields.append( ("login_ticket", my.ticket) )
+                basename = os.path.basename(path)
+                from json import dumps as jsondumps
+                encoding = sys.stdout.encoding
+                if not encoding:
+                    encoding = 'UTF-8'
+                basename = basename.decode(encoding)
+                basename = jsondumps(basename)
+                basename = basename.strip('"')
+                # the first index begins at 0
+                fields.append( ("file_name0", basename) )
 
+	    
             files = [("file", path, buffer)]
             (status, reason, content) = my.upload(my.server_url,fields,files)
 
+            
             if reason != "OK":
                 raise TacticUploadException("Upload of '%s' failed: %s %s" % (path, status, reason) )
 
@@ -79,7 +93,6 @@ class UploadMultipart(object):
         try:
             while 1:
                 try:
-                    urlparts = urlparse.urlsplit(url)
                     ret_value = my.posturl(url,fields,files)
 
                     return ret_value
@@ -101,23 +114,33 @@ class UploadMultipart(object):
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/146306
 
     def posturl(my, url, fields, files):
+        #print "URL ", url
         urlparts = urlparse.urlsplit(url)
-        return my.post_multipart(urlparts[1], urlparts[2], fields,files)
+        protocol = urlparts[0]
+ 
+        return my.post_multipart(urlparts[1], urlparts[2], fields,files, protocol)
                 
 
 
-    def post_multipart(my, host, selector, fields, files):
+    def post_multipart(my, host, selector, fields, files, protocol):
         '''
         Post fields and files to an http host as multipart/form-data.
         fields is a sequence of (name, value) elements for regular form fields.
         files is a sequence of (name, filename, value) elements for data to be uploaded as files.dirk.noteboom@sympatico.ca
         '''
         content_type, body = my.encode_multipart_formdata(fields, files)
-        h = httplib.HTTPConnection(host)  
+        if protocol == 'https':
+            h = httplib.HTTPSConnection(host)  
+        else:
+            h = httplib.HTTPConnection(host)  
         headers = {
             'User-Agent': 'Tactic Client',
             'Content-Type': content_type
             }
+
+        # prevent upgrading the method + url in the httplib module to turn it 
+        # into a unicode string before sending the request
+        selector = str(selector)
         h.request('POST', selector, body, headers)
         res = h.getresponse()
         return res.status, res.reason, res.read()    
@@ -132,15 +155,22 @@ class UploadMultipart(object):
         BOUNDARY = '----------ThIs_Is_tHe_bouNdaRY_---$---'
         CRLF = '\r\n'
         L = []
+
+        import cStringIO
+
+        import sys
+        print "encoding: ", sys.getfilesystemencoding()
         for (key, value) in fields:
             L.append('--' + BOUNDARY)
             L.append('Content-Disposition: form-data; name="%s"' % key)
             L.append('')
             L.append(value)
         for (key, filename, value) in files:
+            #print "len of value: ", len(value)
             L.append('--' + BOUNDARY)
             L.append('Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename))
             L.append('')
+
             L.append(value)
         L.append('--' + BOUNDARY + '--')
         L.append('')
@@ -150,11 +180,14 @@ class UploadMultipart(object):
             M.append(l)
             M.append(CRLF)
 
-        #body = CRLF.join(L)
-        import cStringIO
+        # This fails
+        #body = "".join(M)
+
+        import cStringIO 
         buf = cStringIO.StringIO()
         buf.writelines(M)
         body = buf.getvalue()
+        #print "len of body: ", len(body), type(body)
 
         content_type = 'multipart/form-data; boundary=%s' % BOUNDARY
         return content_type, body 
