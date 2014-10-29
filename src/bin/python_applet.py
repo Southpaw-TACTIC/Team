@@ -22,6 +22,7 @@ import time
 from PySide import QtCore, QtGui, QtWebKit, QtNetwork
 
 
+
 class PythonApplet(QtCore.QObject):
 
     @QtCore.Slot(str)  
@@ -61,25 +62,12 @@ class PythonApplet(QtCore.QObject):
 
     @QtCore.Slot(str)
     def open_explorer(my, dir):
-        if sys.platform == 'win32':
-            dir = dir.replace("/", "\\")
-            os.system('''explorer "%s"''' % dir)
-        else:
-            dir = dir.replace("\\", "/")
-            # Assume OSX
-            os.system('''/usr/bin/open "%s"''' % dir);
-
+        dir = dir.replace("/", "\\")
+        os.system("explorer %s" % dir)
     @QtCore.Slot(str)
     def open_folder(my, dir):
-        if sys.platform == 'win32':
-            dir = dir.replace("/", "\\")
-            os.system('''explorer "%s"''' % dir)
-        else:
-            dir = dir.replace("\\", "/")
-            # Assume OSX
-            os.system('''/usr/bin/open "%s"''' % dir);
-
-
+        dir = dir.replace("/", "\\")
+        os.system("explorer %s" % dir)
 
 
     @QtCore.Slot(str, str)
@@ -221,7 +209,7 @@ class PythonApplet(QtCore.QObject):
     @QtCore.Slot(str, result=str)
     def open_file(my, path):
         os.system(path)
-	return "OK"
+	return data
 
 
     @QtCore.Slot(str, str, str, result=str)
@@ -312,20 +300,7 @@ class PythonApplet(QtCore.QObject):
     def unzip_file(my, from_path, to_dir):
         zip_util = ZipUtil()
         return zip_util.extract(from_path, to_dir)
-
-
-
-    # TEST start the watch folder
-    @QtCore.Slot(str, str, str, result=str)
-    def start_watch_folder(my, server, ticket, project):
-        from watch_local_checkin import WatchLocalRepoCmd
-        WatchLocalRepoCmd(
-                server=server,
-                ticket=ticket,
-                project=project
-        ).start()
-        return "OK"
-
+        
 
     def _py_version(my):  
         '''Return the Python version.'''
@@ -404,21 +379,52 @@ def check_tactic(url, limit=3, verbose=True):
 
 
 #
-# Standalone client
+# Test standalone client
 #
 
+
+class CustomWebView(QtWebKit.QWebView):
+    def __init__(self, parent = None):
+
+        QtWebKit.QWebView.__init__(self, parent)
+
+        settings = self.settings()
+        settings.setAttribute(QtWebKit.QWebSettings.PluginsEnabled, True)
+        settings.setAttribute(QtWebKit.QWebSettings.JavascriptCanOpenWindows, True)
+        settings.setAttribute(QtWebKit.QWebSettings.DeveloperExtrasEnabled, True)
+
+        def loadJavaScriptObjects():
+            applet = PythonApplet()  
+            self.page().mainFrame().addToJavaScriptWindowObject("pyApplet", applet) 
+        QtCore.QObject.connect(self.page().mainFrame(),
+           QtCore.SIGNAL('javaScriptWindowObjectCleared()'), loadJavaScriptObjects)
+
+        self.parent = parent
+
+
+
+    def createWindow(self, webWindowType):
+        title = self.windowTitle()
+        if not title:
+            title = "TACTIC"
+        g = self.geometry()
+        self.view = CustomWebView()
+        self.view.setGeometry(100, 100, g.width(), g.height())
+        #self.view.setGeometry(g)
+        self.view.setWindowTitle(title)
+        self.view.show()
+        return self.view
 
 
 class CustomMainWindow(QtGui.QMainWindow):
 
-    # Cookies implementation referenced from
-    # http://code.google.com/p/devicenzo/source/browse/trunk/devicenzo.py?spec=svn52&r=52#24
-
-
-    def __init__(self):
-        QtGui.QMainWindow.__init__(self)
-
+    def __init__(self, **kwargs):
+        super(CustomMainWindow, self).__init__()
         self.settings = QtCore.QSettings("Southpaw Technology Inc", "TACTIC")
+        self.kwargs = kwargs
+        self.splash = self.kwargs.get('splash')
+        self.webView = self.kwargs.get('webView')
+        self.url = self.kwargs.get('url')
 
         self.cookie_jar = QtNetwork.QNetworkCookieJar()
         cookies = []
@@ -427,17 +433,8 @@ class CustomMainWindow(QtGui.QMainWindow):
             cookie = QtNetwork.QNetworkCookie.parseCookies(str(c))[0]
             cookies.append(cookie)
         self.cookie_jar.setAllCookies(cookies)
-        self.webView = CustomWebView()  
 
-    def add_shortcuts(self):
-        '''add shortcut keys'''
-
-        # zoom functions
-        wv = self.webView
-        self.zoom_in = QtGui.QShortcut("Ctrl++", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
-        self.zoom_in2 = QtGui.QShortcut("Ctrl+=", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
-        self.zoom_out = QtGui.QShortcut("Ctrl+-", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()-.2))
-        self.zoom_reset = QtGui.QShortcut("Ctrl+0", self, activated = lambda: wv.setZoomFactor(1))
+        self.draw()
 
     def load_url(self, url):
         webView = self.webView
@@ -472,42 +469,43 @@ class CustomMainWindow(QtGui.QMainWindow):
             cookie = c.toRawForm()
         self.put("cookiejar", [str(c.toRawForm()) for c in self.cookie_jar.allCookies()])
 
+    def add_shortcuts(self):
+        '''add shortcut keys'''
 
-class CustomWebView(QtWebKit.QWebView):
-    def __init__(self, parent=None):
+        # zoom functions
+        wv = self.webView
+        self.zoom_in = QtGui.QShortcut("Ctrl++", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_in2 = QtGui.QShortcut("Ctrl+=", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()+.2))
+        self.zoom_out = QtGui.QShortcut("Ctrl+-", self, activated = lambda: wv.setZoomFactor(wv.zoomFactor()-.2))
+        self.zoom_reset = QtGui.QShortcut("Ctrl+0", self, activated = lambda: wv.setZoomFactor(1))
+    
+    def draw(self):
+        self.add_shortcuts()
+        data_dir = tacticenv.get_data_dir()
 
-        QtWebKit.QWebView.__init__(self, parent)
+        if os.path.exists(data_dir):
+            geometry = Config.get_value("window", "geometry")
+            title = Config.get_value("window", "title")
+        else:
+            geometry = None
+            title = None
 
-        settings = self.settings()
-        settings.setAttribute(QtWebKit.QWebSettings.PluginsEnabled, True)
-        settings.setAttribute(QtWebKit.QWebSettings.JavascriptCanOpenWindows, True)
-        settings.setAttribute(QtWebKit.QWebSettings.DeveloperExtrasEnabled, True)
-
-
-        def loadJavaScriptObjects():
-            applet = PythonApplet()  
-            self.page().mainFrame().addToJavaScriptWindowObject("pyApplet", applet) 
-        QtCore.QObject.connect(self.page().mainFrame(),
-           QtCore.SIGNAL('javaScriptWindowObjectCleared()'), loadJavaScriptObjects)
-
-        self.parent = parent
-
-
-
-
-    def createWindow(self, webWindowType):
-        title = self.windowTitle()
         if not title:
-            title = "TACTIC"
-        g = self.geometry()
-        self.view = CustomWebView()
-        self.view.setGeometry(100, 100, g.width(), g.height())
-        #self.view.setGeometry(g)
-        self.view.setWindowTitle(title)
-        self.view.show()
-        return self.view
+            title = "TACTIC - %s" % self.url
+            geometry = Config.get_value("window", "geometry")
+        
+        if geometry == "fullscreen":
+            self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+            self.showFullScreen()
+        elif geometry:
+            parts = geometry.split(",")
+            parts = [int(x) for x in parts]
+            self.setGeometry(parts[0], parts[1], parts[2], parts[3])
 
-
+        self.splash.finish(self)
+        self.setWindowTitle(title)
+        self.setCentralWidget(self.webView)  
+        self.show()  
 
 def open_tactic(url=None, client_only=False):   
     import os
@@ -520,11 +518,11 @@ def open_tactic(url=None, client_only=False):
         library_dir = os.path.abspath("../../../PlugIns")
         app.setLibraryPaths([library_dir])
         os.chdir(working_dir)
-
+   
     pixmap = QtGui.QPixmap("bin/favicon.ico")
     icon = QtGui.QIcon(pixmap)
     QtGui.QApplication.setWindowIcon(icon)
-    
+
     pixmap = QtGui.QPixmap("bin/tactic_silver.png")
     splash = QtGui.QSplashScreen(pixmap)
     splash.show()
@@ -589,38 +587,13 @@ def open_tactic(url=None, client_only=False):
                     break
                 time.sleep(0.5)
 
-
-
-
+  
+  
+    webView = CustomWebView()  
+    webView.load(QtCore.QUrl(url))
+  
+    window = CustomMainWindow(splash=splash, webView=webView, url=url)
  
-    window = CustomMainWindow()
-    if os.path.exists(data_dir):
-        geometry = Config.get_value("window", "geometry")
-        title = Config.get_value("window", "title")
-    else:
-        geometry = None
-        title = None
-
-    if not title:
-        title = "TACTIC - %s" % url
-
-    geometry = "fullscreen"
-    if geometry == "fullscreen":
-        window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        window.showFullScreen()
-    elif geometry:
-        parts = geometry.split(",")
-        parts = [int(x) for x in parts]
-        window.setGeometry(parts[0], parts[1], parts[2], parts[3])
-    window.setWindowTitle(title)
-    window.load_url(url)
-
-    window.show()  
-    splash.finish(window)
-
-
-
-    #start_watch_folder = True
     start_watch_folder = False
     if start_watch_folder:
 
@@ -642,10 +615,9 @@ def open_tactic(url=None, client_only=False):
             ).start()
         except Exception, e:
             print "ERROR: ", e
- 
 
-  
     sys.exit(app.exec_())
+ 
 
 
  
@@ -665,8 +637,9 @@ if __name__ == "__main__":
         
         sys.stdout = open(stdout_path,'a')
         sys.stderr = open(stderr_path,'a')
-
-    log_setup()
+    
+    # Disabled for now
+    #log_setup()
     from optparse import OptionParser
 
     parser = OptionParser()
