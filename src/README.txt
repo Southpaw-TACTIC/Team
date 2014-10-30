@@ -3,7 +3,7 @@ Welcome to TACTIC TEAM
 
 You can use one of the 2 methods to access TACTIC:
 
-1. Double-click on the TACTIC 4.1 icon on your desktop to start the server and client at the same time.
+1. Double-click on the TACTIC 4.3 icon on your desktop to start the server and client at the same time.
 
 2. To connect to TACTIC TEAM through a regular browser like Firefox or Chrome, you can use the following URL:
 
@@ -22,7 +22,7 @@ To start it in a way where other people in your internal network can connect to 
 
 2. In Command Prompt, cd to the bin folder of TACTIC:
 
-C:\Program Files (x86)\TACTIC 4.1\bin>"../python/python" startup_standalone.py -
+C:\Program Files (x86)\TACTIC 4.3\bin>"../python/python" startup_standalone.py -
 p 9000 -s 192.168.139.1
  
 
@@ -37,10 +37,10 @@ Developer
 -------------------------------------------------------
 1. If the TACTIC TEAM server is shut down, you can start it by running:
 
-   "C:\Program Files (x86)\TACTIC 4.1\python\python" startup_standalone.py 
+   "C:\Program Files (x86)\TACTIC 4.3\python\python" startup_standalone.py 
    
 It is vital to use the python in this particular directory. 
 
 2. To start the TACTIC TEAM Desktop client on its own, you can double-click on
-the TACTIC Client.bat file in C:\Program Files (x86)\TACTIC 4.1
+the TACTIC Client.bat file in C:\Program Files (x86)\TACTIC 4.3
 
